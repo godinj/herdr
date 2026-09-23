@@ -2554,6 +2554,65 @@ fn navigator_workspace_arrows_cross_machine_headings_without_activating_them() {
 }
 
 #[test]
+fn bookmark_projection_pairs_with_snapshot_and_ignores_stale_revisions() {
+    let mut state = ClientShellState::new(ClientShellConfig::from_config(&Config::default()));
+    let endpoint_id = ClientEndpointId::Local;
+    let mut projected = snapshot();
+    projected.boot_id = "bookmark-boot".into();
+    projected.revision = 4;
+    state.cache_endpoint_snapshot_for_generation(&endpoint_id, 7, Box::new(projected));
+
+    state.set_endpoint_tab_bookmarks(
+        &endpoint_id,
+        7,
+        crate::protocol::endpoint::EndpointTabBookmarks {
+            boot_id: "bookmark-boot".into(),
+            revision: 3,
+            tab_ids: vec!["tab_1".into()],
+        },
+    );
+    assert!(ClientShellState::endpoint_bookmarked_tabs(&state.endpoints[0]).is_none());
+
+    state.set_endpoint_tab_bookmarks(
+        &endpoint_id,
+        7,
+        crate::protocol::endpoint::EndpointTabBookmarks {
+            boot_id: "bookmark-boot".into(),
+            revision: 4,
+            tab_ids: vec!["tab_1".into()],
+        },
+    );
+    assert!(
+        ClientShellState::endpoint_bookmarked_tabs(&state.endpoints[0])
+            .is_some_and(|bookmarks| bookmarks.contains("tab_1"))
+    );
+}
+
+#[test]
+fn bookmark_projection_can_arrive_before_its_snapshot() {
+    let mut state = ClientShellState::new(ClientShellConfig::from_config(&Config::default()));
+    let endpoint_id = ClientEndpointId::Local;
+    state.set_endpoint_tab_bookmarks(
+        &endpoint_id,
+        9,
+        crate::protocol::endpoint::EndpointTabBookmarks {
+            boot_id: "bookmark-boot".into(),
+            revision: 2,
+            tab_ids: vec!["tab_1".into()],
+        },
+    );
+    let mut projected = snapshot();
+    projected.boot_id = "bookmark-boot".into();
+    projected.revision = 2;
+    state.cache_endpoint_snapshot_for_generation(&endpoint_id, 9, Box::new(projected));
+
+    assert!(
+        ClientShellState::endpoint_bookmarked_tabs(&state.endpoints[0])
+            .is_some_and(|bookmarks| bookmarks.contains("tab_1"))
+    );
+}
+
+#[test]
 fn navigator_foreign_workspace_heading_keeps_the_workspace_target() {
     let (mut state, endpoint_id) = state_with_remote();
     state.open_navigator_overlay();

@@ -52,7 +52,7 @@ use crate::server::client_accept::{
 };
 use crate::server::client_shell::{
     render_pane_surface as render_client_shell_pane_surface,
-    snapshot_with_completions as client_shell_snapshot,
+    snapshot_with_completions as client_shell_snapshot, tab_bookmarks as client_tab_bookmarks,
 };
 use crate::server::client_transport::ServerEvent;
 use crate::server::clients::{
@@ -2049,6 +2049,11 @@ impl HeadlessServer {
                     config_diagnostic,
                     None,
                 );
+                let bookmark_projection = client_tab_bookmarks(
+                    &self.app,
+                    &self.client_shell_boot_id,
+                    connection.shell_projection_revision,
+                );
                 let location =
                     crate::server::clients::ClientShellLocation::from_snapshot(&seed_snapshot);
                 let agent_view = self.app.state.agent_view_override.clone();
@@ -2074,6 +2079,14 @@ impl HeadlessServer {
                             return false;
                         }
                     };
+                let bookmark_message =
+                    match crate::protocol::endpoint::tab_bookmarks_message(&bookmark_projection) {
+                        Ok(message) => message,
+                        Err(err) => {
+                            warn!(client_id, err = %err, "failed to encode tab bookmarks");
+                            return false;
+                        }
+                    };
                 let completion_message = match crate::protocol::endpoint::agent_completions_message(
                     &completion_projection,
                 ) {
@@ -2086,6 +2099,7 @@ impl HeadlessServer {
                 connection.shell_location = Some(location);
                 connection.shell_snapshot = Some(seed_snapshot);
                 connection.shell_agent_completions = Some(completion_projection);
+                connection.shell_tab_bookmarks = Some(bookmark_projection);
                 connection.shell_agent_view = agent_view;
                 self.clients.insert(client_id, connection);
                 if self.app.state.popup_pane.is_some() && self.popup_owner_tab_id.is_none() {
@@ -2095,6 +2109,7 @@ impl HeadlessServer {
                     self.send_to_client(client_id, message);
                 }
                 self.send_to_client(client_id, completion_message);
+                self.send_to_client(client_id, bookmark_message);
                 self.send_to_client(client_id, snapshot_message);
                 if surface_active {
                     self.foreground_client_id = Some(client_id);

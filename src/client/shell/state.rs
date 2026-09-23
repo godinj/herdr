@@ -326,6 +326,7 @@ pub(super) struct ClientRenameOverlay {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum ClientNavigatorFilter {
+    Bookmarked,
     Blocked,
     Working,
     Idle,
@@ -517,6 +518,7 @@ pub(super) enum ClientContextMenuAction {
     RemoveWorktree,
     ToggleGroup,
     NewTab,
+    ToggleBookmark,
     RenamePane,
     ClearPaneName,
     SwapWithFocusedPane,
@@ -539,6 +541,8 @@ pub(super) enum ClientContextMenuTarget {
     Tab {
         tab_id: String,
         workspace_id: String,
+        bookmarked: bool,
+        bookmark_supported: bool,
     },
     Pane {
         pane_id: String,

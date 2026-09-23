@@ -145,6 +145,25 @@ impl ClientShellState {
                     outcome.repaint = true;
                     return;
                 }
+                if action == crate::input::KeybindAction::ToggleTabBookmark {
+                    if let Some(tab_id) = self
+                        .snapshot
+                        .as_deref()
+                        .and_then(|snapshot| snapshot.focused_tab_id.clone())
+                    {
+                        let bookmarked = self.active_tab_is_bookmarked(&tab_id);
+                        self.push_endpoint_method(
+                            crate::api::schema::Method::TabBookmarkSet(
+                                crate::api::schema::TabBookmarkSetParams {
+                                    tab_id,
+                                    bookmarked: !bookmarked,
+                                },
+                            ),
+                            outcome,
+                        );
+                    }
+                    return;
+                }
                 if action == crate::input::KeybindAction::RenamePane {
                     self.open_rename_pane_overlay();
                     outcome.repaint = true;

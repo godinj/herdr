@@ -1924,6 +1924,21 @@ async fn run_client_loop(
                                 }
                                 continue;
                             }
+                            Ok(endpoint::EndpointControlMessage::TabBookmarks(projection)) => {
+                                let (cols, rows) = state.reported_size;
+                                let frame = state.shell.as_mut().and_then(|shell| {
+                                    shell.set_endpoint_tab_bookmarks(
+                                        &endpoint_id,
+                                        generation,
+                                        projection,
+                                    );
+                                    shell.compose(cols, rows)
+                                });
+                                if let Some(frame) = frame {
+                                    state.present_frame(frame);
+                                }
+                                continue;
+                            }
                             Ok(endpoint::EndpointControlMessage::Ignored) => {
                                 debug!(%kind, "ignoring unknown endpoint control message");
                                 continue;

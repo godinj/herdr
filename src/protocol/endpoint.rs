@@ -31,6 +31,15 @@ pub const AGENT_VIEW_PROJECTION_CAPABILITY: &str = "agent_view_projection";
 pub const AGENT_VIEW_PROJECTION_KIND: &str = "endpoint.agent-view.v1";
 pub const AGENT_COMPLETIONS_CAPABILITY: &str = "agent_completions";
 pub const AGENT_COMPLETIONS_KIND: &str = "endpoint.agent-completions.v1";
+pub const TAB_BOOKMARKS_CAPABILITY: &str = "tab_bookmarks";
+pub const TAB_BOOKMARKS_KIND: &str = "endpoint.tab-bookmarks.v1";
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EndpointTabBookmarks {
+    pub boot_id: String,
+    pub revision: u64,
+    pub tab_ids: Vec<String>,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EndpointAgentCompletions {
@@ -110,6 +119,15 @@ pub fn snapshot_message(snapshot: &ClientShellSnapshot) -> serde_json::Result<Se
     })
 }
 
+pub fn tab_bookmarks_message(
+    projection: &EndpointTabBookmarks,
+) -> serde_json::Result<ServerMessage> {
+    Ok(ServerMessage::EndpointControl {
+        kind: TAB_BOOKMARKS_KIND.into(),
+        data: serde_json::to_string(projection)?,
+    })
+}
+
 pub fn agent_completions_message(
     projection: &EndpointAgentCompletions,
 ) -> serde_json::Result<ServerMessage> {
@@ -170,6 +188,7 @@ impl EndpointServerWelcome {
                 HEALTH_CHECK_CAPABILITY.into(),
                 AGENT_VIEW_PROJECTION_CAPABILITY.into(),
                 AGENT_COMPLETIONS_CAPABILITY.into(),
+                TAB_BOOKMARKS_CAPABILITY.into(),
             ],
             error: None,
         }
@@ -377,6 +396,7 @@ mod tests {
                 HEALTH_CHECK_CAPABILITY.to_string(),
                 AGENT_VIEW_PROJECTION_CAPABILITY.to_string(),
                 AGENT_COMPLETIONS_CAPABILITY.to_string(),
+                TAB_BOOKMARKS_CAPABILITY.to_string(),
             ]
         );
     }

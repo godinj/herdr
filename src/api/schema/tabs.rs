@@ -37,11 +37,19 @@ pub struct TabMoveParams {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+pub struct TabBookmarkSetParams {
+    pub tab_id: String,
+    pub bookmarked: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct TabInfo {
     pub tab_id: String,
     pub workspace_id: String,
     pub number: usize,
     pub label: String,
+    #[serde(default)]
+    pub bookmarked: bool,
     pub focused: bool,
     pub pane_count: usize,
     pub agent_status: AgentStatus,

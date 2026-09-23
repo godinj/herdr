@@ -295,6 +295,23 @@ fn client_owned_sidebar_dividers_resize_live() {
 }
 
 #[test]
+fn bookmarked_tab_renders_distinct_indicator() {
+    let mut state = ClientShellState::new(ClientShellConfig::from_config(&Config::default()));
+    state.set_snapshot(Box::new(snapshot()));
+    state.set_test_tab_bookmarks(&["tab_1"]);
+    state.set_pane_surface(surface());
+    let frame = state.compose(106, 20).expect("tab bar");
+    let top = frame.cells[..usize::from(frame.width)]
+        .iter()
+        .map(|cell| cell.symbol.as_str())
+        .collect::<String>();
+    assert!(
+        top.contains('◆'),
+        "bookmarked tab indicator missing: {top:?}"
+    );
+}
+
+#[test]
 fn context_menus_capture_stable_targets_and_route_actions() {
     let mut state = ClientShellState::new(ClientShellConfig::from_config(&Config::default()));
     state.set_snapshot(Box::new(snapshot()));
@@ -375,6 +392,32 @@ fn context_menus_capture_stable_targets_and_route_actions() {
             if params.target_pane_id.as_deref() == Some("pane_1")
                 && params.direction == crate::api::schema::SplitDirection::Right
     ));
+}
+
+#[test]
+fn tab_bookmark_context_action_is_hidden_for_old_endpoints() {
+    let mut state = ClientShellState::new(ClientShellConfig::from_config(&Config::default()));
+    state.set_snapshot(Box::new(snapshot()));
+    state.set_endpoint_methods(Some(Vec::new()));
+    state.open_tab_context_menu("tab_1".into(), 0, 0);
+    let Some(ClientShellOverlay::ContextMenu(menu)) = state.overlay.as_ref() else {
+        panic!("tab context menu");
+    };
+    assert!(menu
+        .items()
+        .iter()
+        .all(|item| item.action != ClientContextMenuAction::ToggleBookmark));
+
+    state.overlay = None;
+    state.set_endpoint_methods(Some(vec!["tab.bookmark.set".into()]));
+    state.open_tab_context_menu("tab_1".into(), 0, 0);
+    let Some(ClientShellOverlay::ContextMenu(menu)) = state.overlay.as_ref() else {
+        panic!("tab context menu");
+    };
+    assert!(menu
+        .items()
+        .iter()
+        .any(|item| item.action == ClientContextMenuAction::ToggleBookmark));
 }
 
 #[test]

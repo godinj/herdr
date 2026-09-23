@@ -141,6 +141,10 @@ pub(crate) fn keybind_help_groups(
                 entry(indexed_label(&keybinds.focus_agent), "focus agent 1-9"),
                 entry(binding_label(&keybinds.new_tab), "new tab"),
                 entry(binding_label(&keybinds.rename_tab), "rename tab"),
+                entry(
+                    binding_label(&keybinds.toggle_tab_bookmark),
+                    "toggle tab bookmark",
+                ),
                 entry(binding_label(&keybinds.previous_tab), "previous tab"),
                 entry(binding_label(&keybinds.next_tab), "next tab"),
                 entry(binding_label(&keybinds.move_tab_previous), "move tab left"),

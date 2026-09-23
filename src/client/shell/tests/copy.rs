@@ -1236,6 +1236,52 @@ fn navigator_distinguishes_unnamed_terminals_on_numbered_tabs() {
 }
 
 #[test]
+fn navigator_bookmark_filter_excludes_unbookmarked_tabs_and_combines_with_search() {
+    let mut projected = snapshot();
+    projected.workspaces[0].label = "matching workspace".into();
+    projected.tabs[0].label = "bookmarked review".into();
+    projected.panes[0].label = Some("saved terminal".into());
+    let mut other_tab = projected.tabs[0].clone();
+    other_tab.tab_id = "tab_2".into();
+    other_tab.label = "other review".into();
+    other_tab.focused = false;
+    let mut other_pane = projected.panes[0].clone();
+    other_pane.pane_id = "pane_2".into();
+    other_pane.tab_id = other_tab.tab_id.clone();
+    other_pane.label = Some("matching terminal".into());
+    other_pane.focused = false;
+    projected.tabs.push(other_tab);
+    projected.panes.push(other_pane);
+
+    let mut state = ClientShellState::new(ClientShellConfig::from_config(&Config::default()));
+    state.set_snapshot(Box::new(projected));
+    state.set_test_tab_bookmarks(&["tab_1"]);
+    state.open_navigator_overlay();
+    for (query, expected) in [
+        ("", vec!["pane_1"]),
+        ("matching workspace", vec!["pane_1"]),
+        ("saved", vec!["pane_1"]),
+        ("matching terminal", Vec::new()),
+    ] {
+        let Some(ClientShellOverlay::Navigator(navigator)) = state.overlay.as_mut() else {
+            panic!("navigator");
+        };
+        navigator.query = query.into();
+        navigator.filter = Some(ClientNavigatorFilter::Bookmarked);
+        let rows =
+            render::client_navigator_rows(&state.endpoints, &state.active_endpoint_id, navigator);
+        let panes = rows
+            .iter()
+            .filter_map(|row| match &row.target {
+                ClientNavigatorTarget::Pane { pane_id, .. } => Some(pane_id.as_str()),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(panes, expected, "query={query:?}");
+    }
+}
+
+#[test]
 fn navigator_keeps_empty_workspaces_searchable_without_status_filters() {
     let mut projected = snapshot();
     projected.tabs.clear();

@@ -38,7 +38,7 @@ events, and subscription events.
 The socket API can:
 
 - create, list, focus, rename, and close workspaces
-- create, list, focus, rename, and close tabs
+- create, list, focus, rename, reorder, bookmark, and close tabs
 - list, inspect, split, swap, focus, resize, rename, read, close, and send input to panes
 - list, inspect, read, prompt, wait on, rename, focus, start, and attach agents through CLI helpers
 - report custom agent state from hooks and plugins
@@ -102,7 +102,7 @@ Raw socket method names use dot notation:
 | Session | `session.snapshot` |
 | Workspace | `workspace.create`, `workspace.list`, `workspace.get`, `workspace.focus`, `workspace.rename`, `workspace.move`, `workspace.move_block`, `workspace.report_metadata`, `workspace.close` |
 | Worktree | `worktree.list`, `worktree.create`, `worktree.open`, `worktree.remove` |
-| Tab | `tab.create`, `tab.list`, `tab.get`, `tab.focus`, `tab.rename`, `tab.move`, `tab.close` |
+| Tab | `tab.create`, `tab.list`, `tab.get`, `tab.focus`, `tab.rename`, `tab.move`, `tab.bookmark.set`, `tab.close` |
 | Pane | `pane.split`, `pane.swap`, `pane.move`, `pane.zoom`, `pane.layout`, `pane.process_info`, `pane.neighbor`, `pane.edges`, `pane.focus_direction`, `pane.resize`, `pane.list`, `pane.current`, `pane.get`, `pane.rename`, `pane.send_text`, `pane.send_keys`, `pane.send_input`, `pane.read`, `pane.graphics.info`, `pane.graphics.set`, `pane.graphics.clear`, `pane.graphics.stream`, `pane.report_agent`, `pane.report_agent_session`, `pane.report_metadata`, `pane.clear_agent_authority`, `pane.release_agent`, `pane.close`, `pane.wait_for_output` |
 | Popup | `popup.close` |
 | Layout | `layout.export`, `layout.apply`, `layout.set_split_ratio` |
@@ -233,6 +233,14 @@ placement when the pane becomes visible again.
 `file_frame_damage: true` means Herdr accepts optional damage metadata for
 producer-side canonical-ring efficiency; it still copies or presents the full file.
 Resize and full redraw replay placements without retransmitting pixels.
+
+Tab get/list/create responses include `bookmarked`. Set the shared bookmark state explicitly with `tab.bookmark.set`:
+
+```json
+{"id":"req_bookmark","method":"tab.bookmark.set","params":{"tab_id":"w1:t1","bookmarked":true}}
+```
+
+Clients should advertise and check method support before offering this action; an older server can omit `tab.bookmark.set` without affecting other tab actions.
 
 `pane.layout` returns the tab layout snapshot with `workspace_id`, `tab_id`,
 `zoomed`, outer `area`, `focused_pane_id`, pane rects, and split rects/ratios.

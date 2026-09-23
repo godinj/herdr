@@ -10,6 +10,7 @@ pub(crate) enum EndpointControlMessage {
     HealthPong,
     AgentViewProjection(DecodedAgentViewProjection),
     AgentCompletions(crate::protocol::endpoint::EndpointAgentCompletions),
+    TabBookmarks(crate::protocol::endpoint::EndpointTabBookmarks),
     Snapshot(Box<crate::protocol::ClientShellSnapshot>),
     Ignored,
 }
@@ -24,6 +25,11 @@ pub(crate) fn decode_endpoint_control(
     if kind == crate::protocol::endpoint::AGENT_COMPLETIONS_KIND {
         return Ok(serde_json::from_str(data)
             .map(EndpointControlMessage::AgentCompletions)
+            .unwrap_or(EndpointControlMessage::Ignored));
+    }
+    if kind == crate::protocol::endpoint::TAB_BOOKMARKS_KIND {
+        return Ok(serde_json::from_str(data)
+            .map(EndpointControlMessage::TabBookmarks)
             .unwrap_or(EndpointControlMessage::Ignored));
     }
     if kind == crate::protocol::endpoint::AGENT_VIEW_PROJECTION_KIND {
@@ -105,6 +111,26 @@ mod tests {
             decode_endpoint_control(&kind, "invalid").unwrap(),
             EndpointControlMessage::Ignored
         ));
+    }
+
+    #[test]
+    fn tab_bookmarks_are_an_optional_revision_bound_control() {
+        let projection = crate::protocol::endpoint::EndpointTabBookmarks {
+            boot_id: "boot".into(),
+            revision: 4,
+            tab_ids: vec!["w1:t1".into()],
+        };
+        let crate::protocol::ServerMessage::EndpointControl { kind, data } =
+            crate::protocol::endpoint::tab_bookmarks_message(&projection).unwrap()
+        else {
+            panic!("bookmark projection control");
+        };
+        let EndpointControlMessage::TabBookmarks(decoded) =
+            decode_endpoint_control(&kind, &data).unwrap()
+        else {
+            panic!("decoded bookmark projection");
+        };
+        assert_eq!(decoded, projection);
     }
 
     #[test]

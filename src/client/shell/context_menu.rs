@@ -41,11 +41,25 @@ impl ClientContextMenuOverlay {
                     Action::ToggleGroup,
                 ),
             ],
-            ClientContextMenuTarget::Tab { .. } => vec![
-                item("New tab", Action::NewTab),
-                item("Rename", Action::Rename),
-                item("Close", Action::Close),
-            ],
+            ClientContextMenuTarget::Tab {
+                bookmarked,
+                bookmark_supported,
+                ..
+            } => {
+                let mut items = vec![item("New tab", Action::NewTab)];
+                if *bookmark_supported {
+                    items.push(item(
+                        if *bookmarked {
+                            "Remove bookmark"
+                        } else {
+                            "Bookmark"
+                        },
+                        Action::ToggleBookmark,
+                    ));
+                }
+                items.extend([item("Rename", Action::Rename), item("Close", Action::Close)]);
+                items
+            }
             ClientContextMenuTarget::Pane {
                 source_pane_id,
                 has_manual_label,
@@ -131,10 +145,19 @@ impl ClientShellState {
         else {
             return;
         };
+        let bookmarked = self.active_tab_is_bookmarked(&tab_id);
+        let bookmark_supported = self.supports_endpoint_method(
+            &crate::api::schema::Method::TabBookmarkSet(crate::api::schema::TabBookmarkSetParams {
+                tab_id: tab_id.clone(),
+                bookmarked,
+            }),
+        );
         self.overlay = Some(ClientShellOverlay::ContextMenu(ClientContextMenuOverlay {
             target: ClientContextMenuTarget::Tab {
                 tab_id,
                 workspace_id: tab.workspace_id.clone(),
+                bookmarked,
+                bookmark_supported,
             },
             x,
             y,
@@ -198,7 +221,11 @@ impl ClientShellState {
             ClientContextMenuTarget::Tab {
                 tab_id,
                 workspace_id,
-            } => self.activate_tab_context_action(tab_id, workspace_id, action, outcome),
+                bookmarked,
+                ..
+            } => {
+                self.activate_tab_context_action(tab_id, workspace_id, bookmarked, action, outcome)
+            }
             ClientContextMenuTarget::Pane {
                 pane_id,
                 workspace_id,
@@ -292,6 +319,7 @@ impl ClientShellState {
         &mut self,
         tab_id: String,
         workspace_id: String,
+        bookmarked: bool,
         action: ClientContextMenuAction,
         outcome: &mut ClientShellInput,
     ) {
@@ -339,6 +367,15 @@ impl ClientShellState {
                         outcome,
                     );
                 }
+            }
+            ClientContextMenuAction::ToggleBookmark => {
+                self.push_endpoint_method(
+                    Method::TabBookmarkSet(crate::api::schema::TabBookmarkSetParams {
+                        tab_id,
+                        bookmarked: !bookmarked,
+                    }),
+                    outcome,
+                );
             }
             ClientContextMenuAction::Rename => {
                 let tab = self

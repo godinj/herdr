@@ -1178,6 +1178,7 @@ impl Workspace {
         panes.insert(root_id, PaneState::new(terminal_id));
         let tab = Tab {
             custom_name: None,
+            bookmarked: false,
             number: 1,
             root_pane: root_id,
             layout,
@@ -1234,6 +1235,7 @@ impl Workspace {
         panes.insert(root_id, PaneState::new(TerminalId::alloc()));
         let tab = Tab {
             custom_name: name.map(str::to_string),
+            bookmarked: false,
             number: self.next_public_tab_number,
             root_pane: root_id,
             layout,
@@ -1513,6 +1515,22 @@ mod tests {
         let fourth_root = ws.tabs[fourth_tab].root_pane;
         assert_eq!(ws.public_tab_number_for_pane(fourth_root), Some(4));
         ws.assert_invariants_for_test();
+    }
+
+    #[test]
+    fn bookmark_follows_tab_identity_when_reordered() {
+        let mut ws = Workspace::test_new("test");
+        let bookmarked_tab = ws.test_add_tab(Some("saved"));
+        let bookmarked_root = ws.tabs[bookmarked_tab].root_pane;
+        ws.tabs[bookmarked_tab].bookmarked = true;
+
+        assert!(ws.move_tab(bookmarked_tab, 0));
+        let moved = ws
+            .find_tab_index_for_pane(bookmarked_root)
+            .expect("bookmarked tab should remain present");
+        assert_eq!(moved, 0);
+        assert!(ws.tabs[moved].bookmarked);
+        assert!(ws.tabs.iter().skip(1).all(|tab| !tab.bookmarked));
     }
 
     #[test]

@@ -38,6 +38,7 @@ const CLIENT_SHELL_METHODS: &[&str] = &[
     "product_announcement.dismiss",
     "release_notes.dismiss",
     "server.reload_config",
+    "tab.bookmark.set",
     "tab.close",
     "tab.create",
     "tab.focus",
@@ -297,10 +298,33 @@ mod tests {
             actual.remove("pane.link.resolve").as_deref(),
             Some("f5e4a3e01453ae7b188f127ce951c12c20e0bebcc17cc364eeb6d1a01fd5bf81")
         );
+        assert!(
+            actual.remove("tab.bookmark.set").is_some(),
+            "additive bookmark method must remain advertised"
+        );
 
         assert_eq!(
             actual, expected,
             "an existing endpoint method changed shape; add load-bearing behavior as a new advertised method or explicitly gate new fields"
+        );
+    }
+
+    #[test]
+    fn additive_tab_bookmark_method_shape_is_explicit() {
+        let request = crate::api::schema::Request {
+            id: "bookmark".into(),
+            method: Method::TabBookmarkSet(crate::api::schema::TabBookmarkSetParams {
+                tab_id: "w1:t1".into(),
+                bookmarked: true,
+            }),
+        };
+        assert_eq!(
+            serde_json::to_value(request).expect("bookmark request"),
+            serde_json::json!({
+                "id": "bookmark",
+                "method": "tab.bookmark.set",
+                "params": {"tab_id": "w1:t1", "bookmarked": true}
+            })
         );
     }
 

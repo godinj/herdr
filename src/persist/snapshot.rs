@@ -87,6 +87,8 @@ struct LegacyWorkspaceSnapshot {
 pub struct TabSnapshot {
     #[serde(default)]
     pub custom_name: Option<String>,
+    #[serde(default)]
+    pub bookmarked: bool,
     pub layout: LayoutSnapshot,
     pub panes: HashMap<u32, PaneSnapshot>,
     pub zoomed: bool,
@@ -148,6 +150,7 @@ impl From<LegacyWorkspaceSnapshot> for WorkspaceSnapshot {
         let identity_cwd = legacy_identity_cwd(&snap);
         let tab = TabSnapshot {
             custom_name: None,
+            bookmarked: false,
             layout: snap.layout,
             panes: snap.panes,
             zoomed: snap.zoomed,
@@ -376,6 +379,7 @@ fn capture_tab(
     }
     TabSnapshot {
         custom_name: tab.custom_name.clone(),
+        bookmarked: tab.bookmarked,
         layout: capture_node(tab.layout.root()),
         panes,
         zoomed: tab.zoomed,
@@ -715,6 +719,7 @@ mod tests {
                 next_public_tab_number: 2,
                 tabs: vec![TabSnapshot {
                     custom_name: Some("api".to_string()),
+                    bookmarked: false,
                     layout: LayoutSnapshot::Split {
                         direction: DirectionSnapshot::Horizontal,
                         ratio: 0.5,
@@ -1327,6 +1332,24 @@ mod tests {
     }
 
     #[test]
+    fn old_tab_snapshot_defaults_bookmark_to_false() {
+        let json = r#"{"layout":{"Pane":0},"panes":{},"zoomed":false}"#;
+        let tab: TabSnapshot = serde_json::from_str(json).unwrap();
+        assert!(!tab.bookmarked);
+    }
+
+    #[test]
+    fn capture_round_trip_preserves_tab_bookmark() {
+        let mut state = state_with_workspaces(&["bookmarked"]);
+        state.workspaces[0].tabs[0].bookmarked = true;
+        let snapshot = capture_from_state(&state);
+        assert!(snapshot.workspaces[0].tabs[0].bookmarked);
+        let json = serde_json::to_string(&snapshot).unwrap();
+        let decoded = parse_snapshot(&json).unwrap();
+        assert!(decoded.workspaces[0].tabs[0].bookmarked);
+    }
+
+    #[test]
     fn future_version_is_rejected() {
         let json = r#"{"version":999,"workspaces":[],"active":null,"selected":0}"#;
         assert!(parse_snapshot(json).is_err());
@@ -1380,6 +1403,7 @@ mod tests {
                 next_public_tab_number: 0,
                 tabs: vec![TabSnapshot {
                     custom_name: None,
+                    bookmarked: false,
                     layout: LayoutSnapshot::Split {
                         direction: DirectionSnapshot::Horizontal,
                         ratio: 0.5,

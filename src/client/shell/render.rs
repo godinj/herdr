@@ -310,10 +310,16 @@ pub(super) fn render_shell(
         }
     }
     if layout.tab_bar.height > 0 {
+        let bookmarked_tabs = state
+            .endpoints
+            .iter()
+            .find(|endpoint| &endpoint.endpoint_id == state.active_endpoint_id)
+            .and_then(ClientShellState::endpoint_bookmarked_tabs);
         render_tab_bar(
             buffer,
             layout.tab_bar,
             snapshot,
+            bookmarked_tabs,
             config,
             state.tab_scroll,
             state.reveal_focused_tab,

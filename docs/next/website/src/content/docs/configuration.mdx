@@ -134,6 +134,7 @@ A small keybinding override looks like this:
 prefix = "ctrl+b"
 goto = "prefix+g"
 new_tab = "prefix+c"
+toggle_tab_bookmark = "prefix+m"
 next_tab = "prefix+n"
 previous_tab = "prefix+p"
 focus_pane_left = "prefix+h"
@@ -151,7 +152,7 @@ A binding may also be an array when one action needs multiple shortcuts:
 next_tab = ["prefix+n", "ctrl+alt+]"]
 ```
 
-Optional actions are unset by default. Bind them with `prefix+` for prefix-mode behavior, or use an explicit modified chord when you intentionally want a direct shortcut. For example, tmux-style one-keystroke pane resizing without entering resize mode:
+Optional actions are unset by default. This includes `toggle_tab_bookmark`; bookmarks are always available from the tab context menu, and the example above binds the optional keyboard action to `prefix+m`. Bind optional actions with `prefix+` for prefix-mode behavior, or use an explicit modified chord when you intentionally want a direct shortcut. For example, tmux-style one-keystroke pane resizing without entering resize mode:
 
 ```toml
 [keys]

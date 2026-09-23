@@ -28,10 +28,14 @@ fn client_shell_projection(
     };
     let completions: protocol::endpoint::EndpointAgentCompletions =
         serde_json::from_str(&read_control(protocol::endpoint::AGENT_COMPLETIONS_KIND)).unwrap();
+    let bookmarks: protocol::endpoint::EndpointTabBookmarks =
+        serde_json::from_str(&read_control(protocol::endpoint::TAB_BOOKMARKS_KIND)).unwrap();
     let snapshot: Box<protocol::ClientShellSnapshot> =
         serde_json::from_str(&read_control(protocol::endpoint::ENDPOINT_SNAPSHOT_KIND)).unwrap();
     assert_eq!(completions.boot_id, snapshot.boot_id);
     assert_eq!(completions.revision, snapshot.revision);
+    assert_eq!(bookmarks.boot_id, snapshot.boot_id);
+    assert_eq!(bookmarks.revision, snapshot.revision);
     (snapshot, completions)
 }
 

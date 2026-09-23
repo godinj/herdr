@@ -1946,16 +1946,20 @@ fn graceful_shutdown_sends_server_shutdown_to_client() {
     stream
         .set_read_timeout(Some(Duration::from_secs(5)))
         .unwrap();
-    let result = read_server_message(&mut stream);
-    match result {
-        Ok((variant, _payload)) => {
-            assert_eq!(
-                variant, SERVER_MESSAGE_SERVER_SHUTDOWN,
-                "expected ServerShutdown, got variant {variant}"
-            );
-        }
-        Err(e) => {
-            panic!("expected ServerShutdown message before connection close, got error: {e}");
+    let deadline = Instant::now() + Duration::from_secs(5);
+    loop {
+        match read_server_message(&mut stream) {
+            Ok((SERVER_MESSAGE_SERVER_SHUTDOWN, _)) => break,
+            Ok(_) if Instant::now() < deadline => {
+                // Render and endpoint projection updates queued before shutdown
+                // may still be delivered first.
+            }
+            Ok((variant, _)) => {
+                panic!("expected ServerShutdown, last message was variant {variant}");
+            }
+            Err(e) => {
+                panic!("expected ServerShutdown message before connection close, got error: {e}");
+            }
         }
     }
 

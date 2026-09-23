@@ -37,6 +37,8 @@ enum SplitCommand<'a> {
 
 pub struct Tab {
     pub custom_name: Option<String>,
+    /// Shared runtime marker used to keep important tabs easy to find.
+    pub bookmarked: bool,
     pub number: usize,
     /// Identity source for this tab's pane tree.
     pub root_pane: PaneId,
@@ -181,6 +183,7 @@ impl Tab {
         Ok((
             Self {
                 custom_name: None,
+                bookmarked: false,
                 number,
                 root_pane: root_id,
                 layout,
@@ -203,6 +206,10 @@ impl Tab {
 
     pub fn set_custom_name(&mut self, name: String) {
         self.custom_name = Some(name);
+    }
+
+    pub fn set_bookmarked(&mut self, bookmarked: bool) {
+        self.bookmarked = bookmarked;
     }
 
     pub fn split_focused_command(
@@ -451,6 +458,7 @@ impl Tab {
             #[cfg(test)]
             runtimes: HashMap::new(),
             zoomed: false,
+            bookmarked: false,
             events,
             render_notify,
             render_dirty,

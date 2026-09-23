@@ -14,6 +14,31 @@ pub(super) fn snapshot(
     snapshot_with_completions(app, boot_id, revision, config_diagnostic, location).0
 }
 
+pub(super) fn tab_bookmarks(
+    app: &app::App,
+    boot_id: &str,
+    revision: u64,
+) -> protocol::endpoint::EndpointTabBookmarks {
+    protocol::endpoint::EndpointTabBookmarks {
+        boot_id: boot_id.to_owned(),
+        revision,
+        tab_ids: app
+            .state
+            .workspaces
+            .iter()
+            .enumerate()
+            .flat_map(|(workspace_index, workspace)| {
+                workspace
+                    .tabs
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, tab)| tab.bookmarked)
+                    .filter_map(move |(tab_index, _)| app.public_tab_id(workspace_index, tab_index))
+            })
+            .collect(),
+    }
+}
+
 pub(super) fn snapshot_with_completions(
     app: &app::App,
     boot_id: &str,

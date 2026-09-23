@@ -9,6 +9,14 @@ pub(crate) struct ClientEndpointAgentViewProjection {
 }
 
 #[derive(Clone, Debug)]
+pub(crate) struct ClientEndpointTabBookmarks {
+    generation: Option<u64>,
+    boot_id: String,
+    revision: u64,
+    tab_ids: HashSet<String>,
+}
+
+#[derive(Clone, Debug)]
 pub(crate) struct ClientShellEndpoint {
     pub(crate) endpoint_id: ClientEndpointId,
     pub(crate) label: String,
@@ -17,6 +25,7 @@ pub(crate) struct ClientShellEndpoint {
     /// Connection generation that produced `snapshot`. `None` is reserved for local tests.
     pub(crate) snapshot_generation: Option<u64>,
     pub(crate) agent_recency: HashMap<String, u64>,
+    pub(crate) tab_bookmarks: Option<ClientEndpointTabBookmarks>,
     pub(super) agent_presentation: super::endpoint_agent_state::EndpointAgentPresentation,
     pub(crate) agent_view_projection: Option<ClientEndpointAgentViewProjection>,
     pending_agent_view_projection: Option<ClientEndpointAgentViewProjection>,
@@ -73,6 +82,7 @@ impl ClientShellState {
                 agent_recency: previous
                     .map(|endpoint| endpoint.agent_recency.clone())
                     .unwrap_or_default(),
+                tab_bookmarks: previous.and_then(|endpoint| endpoint.tab_bookmarks.clone()),
                 agent_presentation: previous
                     .map(|endpoint| endpoint.agent_presentation.clone())
                     .unwrap_or_default(),
@@ -124,6 +134,7 @@ impl ClientShellState {
             endpoint.snapshot_generation = None;
             endpoint.methods = None;
             endpoint.agent_recency.clear();
+            endpoint.tab_bookmarks = None;
             endpoint.agent_presentation = Default::default();
             endpoint.agent_view_projection = None;
             endpoint.pending_agent_view_projection = None;
@@ -317,6 +328,52 @@ impl ClientShellState {
             .map(|snapshot| (snapshot.boot_id.as_str(), snapshot.revision))
     }
 
+    pub(crate) fn set_endpoint_tab_bookmarks(
+        &mut self,
+        endpoint_id: &ClientEndpointId,
+        generation: u64,
+        projection: crate::protocol::endpoint::EndpointTabBookmarks,
+    ) {
+        if let Some(endpoint) = self
+            .endpoints
+            .iter_mut()
+            .find(|endpoint| &endpoint.endpoint_id == endpoint_id)
+        {
+            let next = ClientEndpointTabBookmarks {
+                generation: Some(generation),
+                boot_id: projection.boot_id,
+                revision: projection.revision,
+                tab_ids: projection.tab_ids.into_iter().collect(),
+            };
+            if endpoint.tab_bookmarks.as_ref().is_none_or(|current| {
+                current.generation != next.generation
+                    || current.boot_id != next.boot_id
+                    || current.revision <= next.revision
+            }) {
+                endpoint.tab_bookmarks = Some(next);
+            }
+        }
+    }
+
+    pub(super) fn endpoint_bookmarked_tabs(
+        endpoint: &ClientShellEndpoint,
+    ) -> Option<&HashSet<String>> {
+        let snapshot = endpoint.snapshot.as_deref()?;
+        let projection = endpoint.tab_bookmarks.as_ref()?;
+        (projection.generation == endpoint.snapshot_generation
+            && projection.boot_id == snapshot.boot_id
+            && projection.revision == snapshot.revision)
+            .then_some(&projection.tab_ids)
+    }
+
+    pub(super) fn active_tab_is_bookmarked(&self, tab_id: &str) -> bool {
+        self.endpoints
+            .iter()
+            .find(|endpoint| endpoint.endpoint_id == self.active_endpoint_id)
+            .and_then(Self::endpoint_bookmarked_tabs)
+            .is_some_and(|tabs| tabs.contains(tab_id))
+    }
+
     pub(crate) fn set_endpoint_agent_completions(
         &mut self,
         endpoint_id: &ClientEndpointId,
@@ -477,6 +534,26 @@ impl ClientShellState {
     pub(crate) fn set_snapshot(&mut self, snapshot: Box<ClientShellSnapshot>) {
         let endpoint_id = self.active_endpoint_id.clone();
         self.set_endpoint_snapshot(&endpoint_id, snapshot);
+    }
+
+    #[cfg(test)]
+    pub(crate) fn set_test_tab_bookmarks(&mut self, tab_ids: &[&str]) {
+        let Some(endpoint) = self
+            .endpoints
+            .iter_mut()
+            .find(|endpoint| endpoint.endpoint_id == self.active_endpoint_id)
+        else {
+            return;
+        };
+        let Some(snapshot) = endpoint.snapshot.as_deref() else {
+            return;
+        };
+        endpoint.tab_bookmarks = Some(ClientEndpointTabBookmarks {
+            generation: endpoint.snapshot_generation,
+            boot_id: snapshot.boot_id.clone(),
+            revision: snapshot.revision,
+            tab_ids: tab_ids.iter().map(|tab_id| (*tab_id).to_owned()).collect(),
+        });
     }
 
     #[cfg(test)]
@@ -732,6 +809,7 @@ pub(super) fn local_endpoint() -> ClientShellEndpoint {
         snapshot: None,
         snapshot_generation: None,
         agent_recency: HashMap::new(),
+        tab_bookmarks: None,
         agent_presentation: Default::default(),
         agent_view_projection: None,
         pending_agent_view_projection: None,

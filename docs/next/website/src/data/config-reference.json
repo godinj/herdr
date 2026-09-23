@@ -644,6 +644,12 @@
           "description": "Rename the active tab."
         },
         {
+          "key": "keys.toggle_tab_bookmark",
+          "type": "keybinding",
+          "default": "unset",
+          "description": "Toggle the active tab bookmark. Unset by default."
+        },
+        {
           "key": "keys.previous_tab",
           "type": "keybinding",
           "default": "\"prefix+p\"",

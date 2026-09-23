@@ -1040,6 +1040,10 @@
             "agent_status": {
               "$ref": "#/schemas/event/$defs/AgentStatus"
             },
+            "bookmarked": {
+              "default": false,
+              "type": "boolean"
+            },
             "focused": {
               "type": "boolean"
             },
@@ -4354,6 +4358,21 @@
             }
           ]
         },
+        "TabBookmarkSetParams": {
+          "properties": {
+            "bookmarked": {
+              "type": "boolean"
+            },
+            "tab_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "tab_id",
+            "bookmarked"
+          ],
+          "type": "object"
+        },
         "TabCreateParams": {
           "properties": {
             "cwd": {
@@ -5301,6 +5320,22 @@
             },
             "params": {
               "$ref": "#/schemas/request/$defs/TabMoveParams"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "method": {
+              "const": "tab.bookmark.set",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/schemas/request/$defs/TabBookmarkSetParams"
             }
           },
           "required": [
@@ -10772,6 +10807,10 @@
           "properties": {
             "agent_status": {
               "$ref": "#/schemas/success_response/$defs/AgentStatus"
+            },
+            "bookmarked": {
+              "default": false,
+              "type": "boolean"
             },
             "focused": {
               "type": "boolean"

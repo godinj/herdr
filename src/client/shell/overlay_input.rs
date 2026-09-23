@@ -461,7 +461,9 @@ impl ClientShellState {
             }
             Some(ClientShellOverlay::Navigator(navigator)) if navigator.search_focused => {
                 if navigator.query.insert(text) {
-                    navigator.filter = None;
+                    if navigator.filter != Some(ClientNavigatorFilter::Bookmarked) {
+                        navigator.filter = None;
+                    }
                     navigator.selected = None;
                 }
                 true
@@ -656,7 +658,9 @@ impl ClientShellState {
                 if let Some(ClientShellOverlay::Navigator(navigator)) = self.overlay.as_mut() {
                     if let Some(content_changed) = navigator.query.handle_key(key) {
                         if content_changed {
-                            navigator.filter = None;
+                            if navigator.filter != Some(ClientNavigatorFilter::Bookmarked) {
+                                navigator.filter = None;
+                            }
                             navigator.selected = None;
                         }
                         outcome.repaint = true;
@@ -721,7 +725,9 @@ impl ClientShellState {
             if code == KeyCode::Char('/') && modifiers.is_empty() {
                 if let Some(ClientShellOverlay::Navigator(navigator)) = self.overlay.as_mut() {
                     navigator.search_focused = true;
-                    navigator.filter = None;
+                    if navigator.filter != Some(ClientNavigatorFilter::Bookmarked) {
+                        navigator.filter = None;
+                    }
                 }
                 outcome.repaint = true;
                 return;
@@ -747,6 +753,9 @@ impl ClientShellState {
                 return;
             }
             if let Some(filter) = match code {
+                KeyCode::Char('m') if modifiers.is_empty() => {
+                    Some(ClientNavigatorFilter::Bookmarked)
+                }
                 KeyCode::Char('b') if modifiers.is_empty() => Some(ClientNavigatorFilter::Blocked),
                 KeyCode::Char('w') if modifiers.is_empty() => Some(ClientNavigatorFilter::Working),
                 KeyCode::Char('i') if modifiers.is_empty() => Some(ClientNavigatorFilter::Idle),
@@ -754,7 +763,9 @@ impl ClientShellState {
                 _ => None,
             } {
                 if let Some(ClientShellOverlay::Navigator(navigator)) = self.overlay.as_mut() {
-                    navigator.query.clear();
+                    if filter != ClientNavigatorFilter::Bookmarked {
+                        navigator.query.clear();
+                    }
                     navigator.filter = Some(filter);
                     navigator.selected = None;
                 }

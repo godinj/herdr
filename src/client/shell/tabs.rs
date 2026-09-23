@@ -8,6 +8,7 @@ pub(crate) fn render_tab_bar(
     buffer: &mut Buffer,
     area: Rect,
     snapshot: &ClientShellSnapshot,
+    bookmarked_tabs: Option<&std::collections::HashSet<String>>,
     config: &ClientShellConfig,
     tab_scroll: &mut usize,
     reveal_focused_tab: &mut bool,
@@ -25,7 +26,12 @@ pub(crate) fn render_tab_bar(
         .iter()
         .map(|tab| {
             let label = tab_label(tab);
-            display_width(&label).saturating_add(4).max(MIN_TAB_WIDTH)
+            let indicator =
+                u16::from(bookmarked_tabs.is_some_and(|bookmarks| bookmarks.contains(&tab.tab_id)));
+            display_width(&label)
+                .saturating_add(indicator)
+                .saturating_add(4)
+                .max(MIN_TAB_WIDTH)
         })
         .collect::<Vec<_>>();
     let content = tab_bar_content_area(snapshot, area);
@@ -92,7 +98,12 @@ pub(crate) fn render_tab_bar(
     let mut first_visible = None;
     let mut last_visible = None;
     for (index, tab) in tabs.iter().enumerate().skip(*tab_scroll) {
-        let name = tab_label(tab);
+        let label = tab_label(tab);
+        let name = if bookmarked_tabs.is_some_and(|bookmarks| bookmarks.contains(&tab.tab_id)) {
+            format!("◆{label}")
+        } else {
+            label
+        };
         let desired = desired_widths[index];
         let remaining = tab_right.saturating_sub(x);
         let width = desired.min(remaining);

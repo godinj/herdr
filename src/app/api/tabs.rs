@@ -1,8 +1,8 @@
 use std::path::PathBuf;
 
 use crate::api::schema::{
-    EventData, EventEnvelope, EventKind, ResponseResult, TabCreateParams, TabListParams,
-    TabMoveParams, TabRenameParams, TabTarget,
+    EventData, EventEnvelope, EventKind, ResponseResult, TabBookmarkSetParams, TabCreateParams,
+    TabListParams, TabMoveParams, TabRenameParams, TabTarget,
 };
 use crate::app::{App, Mode};
 
@@ -168,6 +168,32 @@ impl App {
         });
         let tab = self.tab_info(ws_idx, tab_idx).unwrap();
 
+        encode_success(id, ResponseResult::TabInfo { tab })
+    }
+
+    pub(super) fn handle_tab_bookmark_set(
+        &mut self,
+        id: String,
+        params: TabBookmarkSetParams,
+    ) -> String {
+        let Some((ws_idx, tab_idx)) = self.parse_tab_id(&params.tab_id) else {
+            return tab_not_found(id, &params.tab_id);
+        };
+        let Some(tab) = self
+            .state
+            .workspaces
+            .get_mut(ws_idx)
+            .and_then(|workspace| workspace.tabs.get_mut(tab_idx))
+        else {
+            return tab_not_found(id, &params.tab_id);
+        };
+        if tab.bookmarked != params.bookmarked {
+            tab.set_bookmarked(params.bookmarked);
+            self.schedule_session_save();
+        }
+        let Some(tab) = self.tab_info(ws_idx, tab_idx) else {
+            return tab_not_found(id, &params.tab_id);
+        };
         encode_success(id, ResponseResult::TabInfo { tab })
     }
 
@@ -392,6 +418,7 @@ mod tests {
         app.state.workspaces = vec![workspace];
         app.state.active = Some(0);
         app.state.selected = 0;
+        app.state.workspaces[0].tabs[0].bookmarked = true;
         let moved_root = app.state.workspaces[0].tabs[0].root_pane;
         let moved_id = app.public_tab_id(0, 0).unwrap();
 
@@ -408,6 +435,8 @@ mod tests {
             panic!("expected tab list");
         };
         assert_eq!(app.state.workspaces[0].tabs[2].root_pane, moved_root);
+        assert!(app.state.workspaces[0].tabs[2].bookmarked);
+        assert!(tabs[2].bookmarked);
         assert_eq!(tabs[2].tab_id, app.public_tab_id(0, 2).unwrap());
         let events = event_hub.events_after(0);
         assert!(events.iter().any(|(_, event)| {
@@ -423,6 +452,42 @@ mod tests {
                     && tabs[2].tab_id == moved_id
             )
         }));
+    }
+
+    #[test]
+    fn api_tab_bookmark_set_returns_updated_shared_tab() {
+        let event_hub = crate::api::EventHub::default();
+        let (_api_tx, api_rx) = tokio::sync::mpsc::unbounded_channel();
+        let mut app = App::new(
+            &Config::default(),
+            crate::app::AppPolicy::TEST,
+            None,
+            api_rx,
+            event_hub,
+        );
+        app.state.workspaces = vec![Workspace::test_new("tabs")];
+        app.state.active = Some(0);
+        let tab_id = app.public_tab_id(0, 0).unwrap();
+
+        let response = app.handle_tab_bookmark_set(
+            "req".into(),
+            TabBookmarkSetParams {
+                tab_id,
+                bookmarked: true,
+            },
+        );
+
+        let success: SuccessResponse = serde_json::from_str(&response).unwrap();
+        assert!(matches!(
+            success.result,
+            ResponseResult::TabInfo {
+                tab: crate::api::schema::TabInfo {
+                    bookmarked: true,
+                    ..
+                }
+            }
+        ));
+        assert!(app.state.workspaces[0].tabs[0].bookmarked);
     }
 
     #[tokio::test]

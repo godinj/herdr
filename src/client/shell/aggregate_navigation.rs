@@ -281,7 +281,8 @@ pub(super) fn navigator_rows(
     navigator: &ClientNavigatorOverlay,
 ) -> Vec<ClientNavigatorRow> {
     let query = navigator.query.trim().to_lowercase();
-    let filter = |status| match navigator.filter {
+    let filter = |status, bookmarked| match navigator.filter {
+        Some(ClientNavigatorFilter::Bookmarked) => bookmarked,
         Some(ClientNavigatorFilter::Blocked) => status == crate::api::schema::AgentStatus::Blocked,
         Some(ClientNavigatorFilter::Working) => status == crate::api::schema::AgentStatus::Working,
         Some(ClientNavigatorFilter::Idle) => status == crate::api::schema::AgentStatus::Idle,
@@ -299,6 +300,7 @@ pub(super) fn navigator_rows(
         let endpoint_query_matches = !query.is_empty() && text(&endpoint.label);
         let mut endpoint_rows = Vec::new();
         if let Some(snapshot) = endpoint.snapshot.as_deref() {
+            let bookmarked_tabs = ClientShellState::endpoint_bookmarked_tabs(endpoint);
             let agents = snapshot
                 .agents
                 .iter()
@@ -332,6 +334,8 @@ pub(super) fn navigator_rows(
                     .unwrap_or_default();
                 let multiple_tabs = workspace_tabs.len() > 1;
                 for tab in workspace_tabs {
+                    let bookmarked =
+                        bookmarked_tabs.is_some_and(|bookmarks| bookmarks.contains(&tab.tab_id));
                     let tab_matches = workspace_matches || text(&tab.label);
                     let tab_panes = panes_by_tab
                         .get(tab.tab_id.as_str())
@@ -380,7 +384,7 @@ pub(super) fn navigator_rows(
                             .as_deref()
                             .or(pane.cwd.as_deref())
                             .unwrap_or_default();
-                        if filter(status)
+                        if filter(status, bookmarked)
                             && (tab_matches
                                 || text(&label)
                                 || text(meta)
