@@ -2589,6 +2589,66 @@ fn bookmark_projection_pairs_with_snapshot_and_ignores_stale_revisions() {
 }
 
 #[test]
+fn bookmark_projection_stays_visible_while_the_next_pair_arrives() {
+    let mut state = ClientShellState::new(ClientShellConfig::from_config(&Config::default()));
+    let endpoint_id = ClientEndpointId::Local;
+    let mut projected = snapshot();
+    projected.boot_id = "bookmark-boot".into();
+    projected.revision = 4;
+    state.cache_endpoint_snapshot_for_generation(&endpoint_id, 7, Box::new(projected.clone()));
+    state.set_endpoint_tab_bookmarks(
+        &endpoint_id,
+        7,
+        crate::protocol::endpoint::EndpointTabBookmarks {
+            boot_id: "bookmark-boot".into(),
+            revision: 4,
+            tab_ids: vec!["tab_1".into()],
+        },
+    );
+
+    state.set_endpoint_tab_bookmarks(
+        &endpoint_id,
+        7,
+        crate::protocol::endpoint::EndpointTabBookmarks {
+            boot_id: "bookmark-boot".into(),
+            revision: 5,
+            tab_ids: vec!["tab_2".into()],
+        },
+    );
+    assert!(
+        ClientShellState::endpoint_bookmarked_tabs(&state.endpoints[0])
+            .is_some_and(|bookmarks| bookmarks.contains("tab_1"))
+    );
+
+    projected.revision = 5;
+    state.cache_endpoint_snapshot_for_generation(&endpoint_id, 7, Box::new(projected.clone()));
+    assert!(
+        ClientShellState::endpoint_bookmarked_tabs(&state.endpoints[0])
+            .is_some_and(|bookmarks| bookmarks.contains("tab_2"))
+    );
+
+    projected.revision = 6;
+    state.cache_endpoint_snapshot_for_generation(&endpoint_id, 7, Box::new(projected));
+    assert!(
+        ClientShellState::endpoint_bookmarked_tabs(&state.endpoints[0])
+            .is_some_and(|bookmarks| bookmarks.contains("tab_2"))
+    );
+    state.set_endpoint_tab_bookmarks(
+        &endpoint_id,
+        7,
+        crate::protocol::endpoint::EndpointTabBookmarks {
+            boot_id: "bookmark-boot".into(),
+            revision: 6,
+            tab_ids: vec!["tab_1".into()],
+        },
+    );
+    assert!(
+        ClientShellState::endpoint_bookmarked_tabs(&state.endpoints[0])
+            .is_some_and(|bookmarks| bookmarks.contains("tab_1"))
+    );
+}
+
+#[test]
 fn bookmark_projection_can_arrive_before_its_snapshot() {
     let mut state = ClientShellState::new(ClientShellConfig::from_config(&Config::default()));
     let endpoint_id = ClientEndpointId::Local;

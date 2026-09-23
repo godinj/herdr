@@ -288,10 +288,16 @@ pub(super) fn render_shell(
                 );
             }
         } else if state.sidebar_collapsed {
+            let bookmarked_tabs = state
+                .endpoints
+                .iter()
+                .find(|endpoint| &endpoint.endpoint_id == state.active_endpoint_id)
+                .and_then(ClientShellState::endpoint_bookmarked_tabs);
             render_collapsed_sidebar(
                 buffer,
                 layout.sidebar,
                 snapshot,
+                bookmarked_tabs,
                 config,
                 state
                     .selected_workspace_id

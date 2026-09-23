@@ -489,6 +489,7 @@ fn agent_sidebar_honors_priority_symbols_tokens_and_stable_hits() {
     );
     let mut state = ClientShellState::new(ClientShellConfig::from_config(&config));
     state.set_snapshot(Box::new(projected));
+    state.set_test_tab_bookmarks(&["tab_1"]);
     state.set_pane_surface(surface());
 
     let frame = state.compose(106, 30).expect("agent sidebar frame");
@@ -505,6 +506,16 @@ fn agent_sidebar_honors_priority_symbols_tokens_and_stable_hits() {
     assert!(text.contains("× needs input"), "frame: {text}");
     assert!(text.contains("pi two"), "frame: {text}");
     assert!(text.contains("waiting for"), "frame: {text}");
+    let bookmarked_row = state
+        .hits
+        .agents
+        .first()
+        .map(|(rect, _)| rect)
+        .expect("bookmarked agent row");
+    let bookmark_index =
+        bookmarked_row.y as usize * frame.width as usize + bookmarked_row.x as usize;
+    assert_eq!(frame.cells[bookmark_index].symbol, "◆");
+    assert_eq!(frame.cells[bookmark_index + 1].symbol, " ");
     assert_eq!(
         state
             .hits

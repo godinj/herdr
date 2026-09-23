@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use ratatui::{
     buffer::Buffer,
@@ -14,6 +14,7 @@ pub(super) struct AgentRow {
     pub(super) pane_id: String,
     pub(super) status: crate::api::schema::AgentStatus,
     pub(super) focused: bool,
+    pub(super) bookmarked: bool,
     pub(super) rows: Vec<Vec<crate::ui::ResolvedToken>>,
 }
 
@@ -53,6 +54,7 @@ pub(super) fn render_agent_panel(
     buffer: &mut Buffer,
     area: Rect,
     snapshot: &ClientShellSnapshot,
+    bookmarked_tabs: Option<&HashSet<String>>,
     config: &ClientShellConfig,
     agent_scroll: &mut usize,
     hits: &mut ShellHitMap,
@@ -67,7 +69,14 @@ pub(super) fn render_agent_panel(
         return;
     }
 
-    let rows = agent_rows(snapshot, config, None);
+    let mut rows = agent_rows(snapshot, config, None);
+    for row in &mut rows {
+        row.bookmarked = snapshot
+            .agents
+            .iter()
+            .find(|agent| agent.pane_id == row.pane_id)
+            .is_some_and(|agent| bookmarked_tabs.is_some_and(|tabs| tabs.contains(&agent.tab_id)));
+    }
     render_agent_list(
         buffer,
         area,
@@ -314,6 +323,7 @@ pub(super) fn agent_row(
         pane_id: agent.pane_id.clone(),
         status: agent.agent_status,
         focused: agent.focused,
+        bookmarked: false,
         rows,
     })
 }
@@ -355,7 +365,13 @@ pub(super) fn render_agent_row(
     };
     for (index, tokens) in rows.iter().take(rect.height as usize).enumerate() {
         let indent = if index == 0 { 1 } else { 3 };
-        let mut spans = vec![ratatui::text::Span::raw(" ".repeat(indent))];
+        let prefix = if index == 0 && row.bookmarked {
+            "◆ ".to_owned()
+        } else {
+            " ".repeat(indent)
+        };
+        let prefix_width = unicode_width::UnicodeWidthStr::width(prefix.as_str());
+        let mut spans = vec![ratatui::text::Span::raw(prefix)];
         spans.extend(crate::ui::resolved_token_spans(
             tokens,
             icon,
@@ -364,7 +380,7 @@ pub(super) fn render_agent_row(
             secondary,
             secondary,
             palette,
-            rect.width.saturating_sub(indent as u16) as usize,
+            rect.width.saturating_sub(prefix_width as u16) as usize,
         ));
         Paragraph::new(Line::from(spans)).style(row_style).render(
             Rect::new(rect.x, rect.y + index as u16, rect.width, 1),

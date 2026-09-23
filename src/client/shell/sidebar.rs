@@ -48,6 +48,7 @@ pub(crate) fn render_collapsed_sidebar(
     buffer: &mut Buffer,
     area: Rect,
     snapshot: &ClientShellSnapshot,
+    bookmarked_tabs: Option<&HashSet<String>>,
     config: &ClientShellConfig,
     selected_workspace_id: Option<&str>,
     hits: &mut ShellHitMap,
@@ -160,12 +161,17 @@ pub(crate) fn render_collapsed_sidebar(
                 palette.overlay0
             }),
         );
+        let bookmarked = bookmarked_tabs.is_some_and(|tabs| tabs.contains(&agent.tab_id));
         put_text(
             buffer,
             rect.x.saturating_add(2),
             rect.y,
             rect.width.saturating_sub(2),
-            status_icon(agent.agent_status, config.status_indicators),
+            &format!(
+                "{}{}",
+                status_icon(agent.agent_status, config.status_indicators),
+                if bookmarked { "◆" } else { "" }
+            ),
             Style::default().fg(status_color(agent.agent_status, palette)),
         );
         hits.agents.push((rect, pane_id));
@@ -430,10 +436,16 @@ pub(crate) fn render_sidebar(
         }
     }
 
+    let bookmarked_tabs = state
+        .endpoints
+        .iter()
+        .find(|endpoint| &endpoint.endpoint_id == state.active_endpoint_id)
+        .and_then(ClientShellState::endpoint_bookmarked_tabs);
     super::render_agent_panel(
         buffer,
         detail_area,
         snapshot,
+        bookmarked_tabs,
         config,
         state.agent_scroll,
         hits,

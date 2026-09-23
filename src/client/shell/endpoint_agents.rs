@@ -22,7 +22,8 @@ pub(super) fn render_collapsed(
             rect.y,
             rect.width,
             &format!(
-                "{initial}{}",
+                "{}{initial}{}",
+                if row.agent.bookmarked { "◆" } else { "" },
                 status_icon(row.agent.status, config.status_indicators)
             ),
             Style::default()
@@ -138,16 +139,20 @@ fn agent_rows(
         .iter()
         .filter_map(|endpoint| {
             endpoint.snapshot.as_deref().map(|snapshot| {
+                let bookmarked_tabs = ClientShellState::endpoint_bookmarked_tabs(endpoint);
                 snapshot
                     .agents
                     .iter()
                     .filter_map(|agent| {
-                        super::agent_sidebar::agent_row(
+                        let mut row = super::agent_sidebar::agent_row(
                             snapshot,
                             &agent.pane_id,
                             config,
                             Some(&endpoint.label),
-                        )
+                        )?;
+                        row.bookmarked =
+                            bookmarked_tabs.is_some_and(|tabs| tabs.contains(&agent.tab_id));
+                        Some(row)
                     })
                     .map(|agent| ((endpoint.endpoint_id.clone(), agent.pane_id.clone()), agent))
                     .collect::<Vec<_>>()

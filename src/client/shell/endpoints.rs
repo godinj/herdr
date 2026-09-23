@@ -26,6 +26,7 @@ pub(crate) struct ClientShellEndpoint {
     pub(crate) snapshot_generation: Option<u64>,
     pub(crate) agent_recency: HashMap<String, u64>,
     pub(crate) tab_bookmarks: Option<ClientEndpointTabBookmarks>,
+    pending_tab_bookmarks: Option<ClientEndpointTabBookmarks>,
     pub(super) agent_presentation: super::endpoint_agent_state::EndpointAgentPresentation,
     pub(crate) agent_view_projection: Option<ClientEndpointAgentViewProjection>,
     pending_agent_view_projection: Option<ClientEndpointAgentViewProjection>,
@@ -83,6 +84,8 @@ impl ClientShellState {
                     .map(|endpoint| endpoint.agent_recency.clone())
                     .unwrap_or_default(),
                 tab_bookmarks: previous.and_then(|endpoint| endpoint.tab_bookmarks.clone()),
+                pending_tab_bookmarks: previous
+                    .and_then(|endpoint| endpoint.pending_tab_bookmarks.clone()),
                 agent_presentation: previous
                     .map(|endpoint| endpoint.agent_presentation.clone())
                     .unwrap_or_default(),
@@ -135,6 +138,7 @@ impl ClientShellState {
             endpoint.methods = None;
             endpoint.agent_recency.clear();
             endpoint.tab_bookmarks = None;
+            endpoint.pending_tab_bookmarks = None;
             endpoint.agent_presentation = Default::default();
             endpoint.agent_view_projection = None;
             endpoint.pending_agent_view_projection = None;
@@ -334,17 +338,24 @@ impl ClientShellState {
         generation: u64,
         projection: crate::protocol::endpoint::EndpointTabBookmarks,
     ) {
-        if let Some(endpoint) = self
+        let Some(endpoint) = self
             .endpoints
             .iter_mut()
             .find(|endpoint| &endpoint.endpoint_id == endpoint_id)
+        else {
+            return;
+        };
+        let next = ClientEndpointTabBookmarks {
+            generation: Some(generation),
+            boot_id: projection.boot_id,
+            revision: projection.revision,
+            tab_ids: projection.tab_ids.into_iter().collect(),
+        };
+        if endpoint.snapshot_generation == next.generation
+            && endpoint.snapshot.as_deref().is_some_and(|snapshot| {
+                snapshot.boot_id == next.boot_id && snapshot.revision == next.revision
+            })
         {
-            let next = ClientEndpointTabBookmarks {
-                generation: Some(generation),
-                boot_id: projection.boot_id,
-                revision: projection.revision,
-                tab_ids: projection.tab_ids.into_iter().collect(),
-            };
             if endpoint.tab_bookmarks.as_ref().is_none_or(|current| {
                 current.generation != next.generation
                     || current.boot_id != next.boot_id
@@ -352,6 +363,31 @@ impl ClientShellState {
             }) {
                 endpoint.tab_bookmarks = Some(next);
             }
+            endpoint.pending_tab_bookmarks = None;
+            return;
+        }
+        if endpoint.snapshot_generation == next.generation
+            && endpoint.snapshot.as_deref().is_some_and(|snapshot| {
+                snapshot.boot_id == next.boot_id && snapshot.revision > next.revision
+            })
+        {
+            return;
+        }
+        let newer_than_effective = endpoint.tab_bookmarks.as_ref().is_none_or(|current| {
+            current.generation != next.generation
+                || current.boot_id != next.boot_id
+                || current.revision < next.revision
+        });
+        let newer_than_pending = endpoint
+            .pending_tab_bookmarks
+            .as_ref()
+            .is_none_or(|current| {
+                current.generation != next.generation
+                    || current.boot_id != next.boot_id
+                    || current.revision <= next.revision
+            });
+        if newer_than_effective && newer_than_pending {
+            endpoint.pending_tab_bookmarks = Some(next);
         }
     }
 
@@ -361,8 +397,7 @@ impl ClientShellState {
         let snapshot = endpoint.snapshot.as_deref()?;
         let projection = endpoint.tab_bookmarks.as_ref()?;
         (projection.generation == endpoint.snapshot_generation
-            && projection.boot_id == snapshot.boot_id
-            && projection.revision == snapshot.revision)
+            && projection.boot_id == snapshot.boot_id)
             .then_some(&projection.tab_ids)
     }
 
@@ -554,6 +589,7 @@ impl ClientShellState {
             revision: snapshot.revision,
             tab_ids: tab_ids.iter().map(|tab_id| (*tab_id).to_owned()).collect(),
         });
+        endpoint.pending_tab_bookmarks = None;
     }
 
     #[cfg(test)]
@@ -694,6 +730,44 @@ impl ClientShellState {
         endpoint.agent_recency = recency;
         endpoint.snapshot_generation = generation;
         endpoint.snapshot = Some(snapshot);
+        let pending_bookmarks_match =
+            endpoint
+                .pending_tab_bookmarks
+                .as_ref()
+                .is_some_and(|projection| {
+                    projection.generation == generation
+                        && endpoint.snapshot.as_deref().is_some_and(|snapshot| {
+                            projection.boot_id == snapshot.boot_id
+                                && projection.revision == snapshot.revision
+                        })
+                });
+        if pending_bookmarks_match {
+            endpoint.tab_bookmarks = endpoint.pending_tab_bookmarks.take();
+        } else {
+            let keep_pending_bookmarks =
+                endpoint
+                    .pending_tab_bookmarks
+                    .as_ref()
+                    .is_some_and(|projection| {
+                        projection.generation == generation
+                            && endpoint.snapshot.as_deref().is_some_and(|snapshot| {
+                                projection.boot_id == snapshot.boot_id
+                                    && projection.revision > snapshot.revision
+                            })
+                    });
+            if !keep_pending_bookmarks {
+                endpoint.pending_tab_bookmarks = None;
+            }
+            if endpoint.tab_bookmarks.as_ref().is_some_and(|projection| {
+                projection.generation != generation
+                    || endpoint
+                        .snapshot
+                        .as_deref()
+                        .is_some_and(|snapshot| projection.boot_id != snapshot.boot_id)
+            }) {
+                endpoint.tab_bookmarks = None;
+            }
+        }
         let pending_matches =
             endpoint
                 .pending_agent_view_projection
@@ -810,6 +884,7 @@ pub(super) fn local_endpoint() -> ClientShellEndpoint {
         snapshot_generation: None,
         agent_recency: HashMap::new(),
         tab_bookmarks: None,
+        pending_tab_bookmarks: None,
         agent_presentation: Default::default(),
         agent_view_projection: None,
         pending_agent_view_projection: None,
