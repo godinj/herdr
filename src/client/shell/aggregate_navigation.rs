@@ -281,16 +281,26 @@ pub(super) fn navigator_rows(
     navigator: &ClientNavigatorOverlay,
 ) -> Vec<ClientNavigatorRow> {
     let query = navigator.query.trim().to_lowercase();
-    let filter = |status, bookmarked| match navigator.filter {
-        Some(ClientNavigatorFilter::Bookmarked) => bookmarked,
-        Some(ClientNavigatorFilter::Blocked) => status == crate::api::schema::AgentStatus::Blocked,
-        Some(ClientNavigatorFilter::Working) => status == crate::api::schema::AgentStatus::Working,
-        Some(ClientNavigatorFilter::Idle) => status == crate::api::schema::AgentStatus::Idle,
-        Some(ClientNavigatorFilter::Done) => status == crate::api::schema::AgentStatus::Done,
-        None => true,
+    let filter = |status, bookmarked: bool| {
+        (!navigator.bookmarked_only || bookmarked)
+            && match navigator.filter {
+                Some(ClientNavigatorFilter::Blocked) => {
+                    status == crate::api::schema::AgentStatus::Blocked
+                }
+                Some(ClientNavigatorFilter::Working) => {
+                    status == crate::api::schema::AgentStatus::Working
+                }
+                Some(ClientNavigatorFilter::Idle) => {
+                    status == crate::api::schema::AgentStatus::Idle
+                }
+                Some(ClientNavigatorFilter::Done) => {
+                    status == crate::api::schema::AgentStatus::Done
+                }
+                None => true,
+            }
     };
     let text = |value: &str| query.is_empty() || value.to_lowercase().contains(&query);
-    let filtering = navigator.filter.is_some() || !query.is_empty();
+    let filtering = navigator.bookmarked_only || navigator.filter.is_some() || !query.is_empty();
     let federated = endpoints.len() > 1;
     let depth_offset = u8::from(federated);
     let mut rows = Vec::new();
@@ -419,7 +429,10 @@ pub(super) fn navigator_rows(
                 }
                 if !filtering
                     || !children.is_empty()
-                    || (navigator.filter.is_none() && !query.is_empty() && workspace_matches)
+                    || (!navigator.bookmarked_only
+                        && navigator.filter.is_none()
+                        && !query.is_empty()
+                        && workspace_matches)
                 {
                     endpoint_rows.push(ClientNavigatorRow {
                         depth: depth_offset,

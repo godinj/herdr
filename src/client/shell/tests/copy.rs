@@ -1267,7 +1267,7 @@ fn navigator_bookmark_filter_excludes_unbookmarked_tabs_and_combines_with_search
             panic!("navigator");
         };
         navigator.query = query.into();
-        navigator.filter = Some(ClientNavigatorFilter::Bookmarked);
+        navigator.bookmarked_only = true;
         let rows =
             render::client_navigator_rows(&state.endpoints, &state.active_endpoint_id, navigator);
         let panes = rows
@@ -1279,6 +1279,130 @@ fn navigator_bookmark_filter_excludes_unbookmarked_tabs_and_combines_with_search
             .collect::<Vec<_>>();
         assert_eq!(panes, expected, "query={query:?}");
     }
+}
+
+#[test]
+fn navigator_bookmarks_combine_with_every_status_in_either_key_order() {
+    let mut projected = snapshot();
+    let tab = projected.tabs[0].clone();
+    let pane = projected.panes[0].clone();
+    projected.tabs.clear();
+    projected.panes.clear();
+    projected.agents.clear();
+    let statuses = [
+        ('b', AgentStatus::Blocked, ClientNavigatorFilter::Blocked),
+        ('w', AgentStatus::Working, ClientNavigatorFilter::Working),
+        ('i', AgentStatus::Idle, ClientNavigatorFilter::Idle),
+        ('d', AgentStatus::Done, ClientNavigatorFilter::Done),
+    ];
+    for bookmarked in [true, false] {
+        let tab_id = if bookmarked { "saved" } else { "unsaved" };
+        let mut tab = tab.clone();
+        tab.tab_id = tab_id.into();
+        projected.tabs.push(tab);
+        for (key, status, _) in statuses {
+            let pane_id = format!("{tab_id}-{key}");
+            let mut pane = pane.clone();
+            pane.tab_id = tab_id.into();
+            pane.pane_id = pane_id.clone();
+            projected.panes.push(pane);
+            projected.agents.push(ClientShellAgent {
+                pane_id,
+                workspace_id: "ws_1".into(),
+                tab_id: tab_id.into(),
+                name: None,
+                display_agent: None,
+                agent: Some("pi".into()),
+                title: None,
+                terminal_title: None,
+                terminal_title_stripped: None,
+                agent_status: if status == AgentStatus::Done {
+                    AgentStatus::Working
+                } else {
+                    status
+                },
+                state_change_seq: 1,
+                state_labels: Vec::new(),
+                tokens: Vec::new(),
+                focused: false,
+            });
+        }
+    }
+    let mut state = ClientShellState::new(ClientShellConfig::from_config(&Config::default()));
+    state.set_snapshot(Box::new(projected.clone()));
+    projected.revision += 1;
+    for agent in &mut projected.agents {
+        if agent.pane_id.ends_with("-d") {
+            agent.agent_status = AgentStatus::Idle;
+            agent.state_change_seq += 1;
+        }
+    }
+    let mut pane_surface = surface();
+    pane_surface.projection_revision = projected.revision;
+    state.set_snapshot(Box::new(projected));
+    state.set_pane_surface(pane_surface);
+    state.set_test_tab_bookmarks(&["saved"]);
+    let visible_panes = |state: &ClientShellState| {
+        let Some(ClientShellOverlay::Navigator(navigator)) = state.overlay.as_ref() else {
+            panic!("navigator");
+        };
+        render::client_navigator_rows(&state.endpoints, &state.active_endpoint_id, navigator)
+            .into_iter()
+            .filter_map(|row| match row.target {
+                ClientNavigatorTarget::Pane { pane_id, .. } => Some(pane_id),
+                _ => None,
+            })
+            .collect::<Vec<_>>()
+    };
+    for (key, _, filter) in statuses {
+        for keys in [format!("m{key}"), format!("{key}m")] {
+            state.open_navigator_overlay();
+            state.handle_input_bytes(keys.as_bytes());
+            assert_eq!(visible_panes(&state), [format!("saved-{key}")], "{keys}");
+            let Some(ClientShellOverlay::Navigator(navigator)) = state.overlay.as_ref() else {
+                panic!("navigator");
+            };
+            assert!(navigator.bookmarked_only);
+            assert_eq!(navigator.filter, Some(filter));
+            let frame = state.compose(120, 30).expect("navigator");
+            let text = frame
+                .cells
+                .iter()
+                .map(|cell| cell.symbol.as_str())
+                .collect::<String>();
+            assert!(text.contains("bookmarked + "));
+
+            // Toggling bookmarks off retains the selected status.
+            state.handle_input_bytes(b"m");
+            assert_eq!(
+                visible_panes(&state),
+                [format!("saved-{key}"), format!("unsaved-{key}")]
+            );
+            state.handle_input_bytes(b"m");
+            assert_eq!(visible_panes(&state), [format!("saved-{key}")]);
+
+            // Changing status retains bookmarks, and all resets both.
+            state.handle_input_bytes(b"w");
+            assert_eq!(visible_panes(&state), ["saved-w"]);
+            state.handle_input_bytes(b"a");
+            assert_eq!(visible_panes(&state).len(), 8);
+            state.handle_input_bytes(b"mb");
+            state.handle_raw_events(vec![RawInputEvent::Key(crate::input::TerminalKey::new(
+                KeyCode::Backspace,
+                KeyModifiers::empty(),
+            ))]);
+            assert_eq!(visible_panes(&state).len(), 8);
+        }
+    }
+
+    // Search still replaces the status filter, but preserves bookmarks.
+    state.handle_input_bytes(b"mb/pi");
+    assert_eq!(visible_panes(&state).len(), 4);
+    let Some(ClientShellOverlay::Navigator(navigator)) = state.overlay.as_ref() else {
+        panic!("navigator");
+    };
+    assert!(navigator.bookmarked_only);
+    assert_eq!(navigator.filter, None);
 }
 
 #[test]

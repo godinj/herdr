@@ -721,15 +721,25 @@ fn render_navigator_overlay(
         " / ".to_owned()
     } else if let Some(f) = n.filter {
         format!(
-            " / {}",
+            " / {}{}",
+            if n.bookmarked_only {
+                "bookmarked + "
+            } else {
+                ""
+            },
             match f {
-                ClientNavigatorFilter::Bookmarked => "bookmarked",
                 ClientNavigatorFilter::Blocked => "blocked",
                 ClientNavigatorFilter::Working => "working",
                 ClientNavigatorFilter::Idle => "idle",
                 ClientNavigatorFilter::Done => "done",
             }
         )
+    } else if n.bookmarked_only {
+        if n.query.is_empty() {
+            " / bookmarked".to_owned()
+        } else {
+            format!(" / bookmarked + {}", n.query)
+        }
     } else if n.query.is_empty() {
         " / search agents and terminals".to_owned()
     } else {
@@ -1016,7 +1026,7 @@ fn render_navigator_overlay(
         if n.search_focused {
             " search type · move ↑↓/ctrl+n/p · open enter · back esc"
         } else {
-            " ↑↓/j/k rows · ←→ workspace · / search · a/m/b/w/i/d filter · enter open · q close"
+            " ↑↓/j/k rows · ←→ workspace · / search · m bookmarks · a/b/w/i/d filter · enter open · q close"
         },
         Style::default().fg(p.overlay0).bg(p.panel_bg),
     );

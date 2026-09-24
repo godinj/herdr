@@ -326,7 +326,6 @@ pub(super) struct ClientRenameOverlay {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum ClientNavigatorFilter {
-    Bookmarked,
     Blocked,
     Working,
     Idle,
@@ -368,6 +367,7 @@ pub(super) struct ClientNavigatorOverlay {
     pub(super) selected: Option<ClientNavigatorTarget>,
     pub(super) scroll: usize,
     pub(super) filter: Option<ClientNavigatorFilter>,
+    pub(super) bookmarked_only: bool,
 }
 
 #[derive(Debug)]
