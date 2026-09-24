@@ -1016,7 +1016,7 @@ fn render_navigator_overlay(
         if n.search_focused {
             " search type · move ↑↓/ctrl+n/p · open enter · back esc"
         } else {
-            " ↑↓/j/k rows · ←→ workspace · / search · a/m/b/w/i/d filter · enter open · esc close"
+            " ↑↓/j/k rows · ←→ workspace · / search · a/m/b/w/i/d filter · enter open · q close"
         },
         Style::default().fg(p.overlay0).bg(p.panel_bg),
     );
@@ -1132,7 +1132,7 @@ fn render_help_overlay(
         if h.search_focused {
             " esc back "
         } else {
-            " esc close "
+            " q close "
         },
         Style::default()
             .fg(contrast(p))
@@ -1225,7 +1225,7 @@ fn render_help_overlay(
         if h.search_focused {
             " edit ←→/home/end · kill ^u/^k · yank ^y · scroll ↑↓ · back esc"
         } else {
-            " search / · scroll j/k/↑↓/pgup/pgdn · close esc/enter"
+            " search / · scroll j/k/↑↓/pgup/pgdn · close q/enter"
         },
         Style::default().fg(p.overlay0).bg(p.panel_bg),
     );

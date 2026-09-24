@@ -1719,6 +1719,52 @@ fn navigator_render_scale_profile() {
 }
 
 #[test]
+fn navigator_closes_with_q_not_escape() {
+    let mut state = ClientShellState::new(ClientShellConfig::from_config(&Config::default()));
+    state.set_snapshot(Box::new(snapshot()));
+    state.open_navigator_overlay();
+
+    state.handle_input_bytes(b"\x1b");
+    assert!(matches!(
+        state.overlay,
+        Some(ClientShellOverlay::Navigator(_))
+    ));
+
+    state.handle_raw_events(vec![RawInputEvent::Key(crate::input::TerminalKey::new(
+        KeyCode::Char('q'),
+        KeyModifiers::CONTROL,
+    ))]);
+    assert!(matches!(
+        state.overlay,
+        Some(ClientShellOverlay::Navigator(_))
+    ));
+
+    state.handle_input_bytes(b"/q");
+    let Some(ClientShellOverlay::Navigator(navigator)) = state.overlay.as_ref() else {
+        panic!("typing q in search must not close the navigator");
+    };
+    assert!(navigator.search_focused);
+    assert_eq!(navigator.query.as_str(), "q");
+
+    state.handle_input_bytes(b"\x1b");
+    let Some(ClientShellOverlay::Navigator(navigator)) = state.overlay.as_ref() else {
+        panic!("escape must only leave search");
+    };
+    assert!(!navigator.search_focused);
+    assert_eq!(navigator.query.as_str(), "q");
+
+    state.handle_input_bytes(b"\x1b");
+    assert!(matches!(
+        state.overlay,
+        Some(ClientShellOverlay::Navigator(_))
+    ));
+    let close = state.handle_input_bytes(b"q");
+    assert!(state.overlay.is_none());
+    assert!(close.repaint);
+    assert!(close.actions.is_empty());
+}
+
+#[test]
 fn navigator_owns_search_mouse_selection_and_stable_target_focus() {
     let mut state = ClientShellState::new(ClientShellConfig::from_config(&Config::default()));
     state.set_snapshot(Box::new(snapshot()));

@@ -695,6 +695,60 @@ fn custom_binding_missing_from_endpoint_manifest_is_not_forwarded() {
 }
 
 #[test]
+fn help_overlay_closes_with_q_not_escape() {
+    let mut state = ClientShellState::new(ClientShellConfig::from_config(&Config::default()));
+    state.set_snapshot(Box::new(snapshot()));
+    state.set_pane_surface(surface());
+    state.record_binding(
+        crate::input::KeybindMatch::Action(crate::input::KeybindAction::Help),
+        &mut ClientShellInput::default(),
+    );
+
+    state.handle_input_bytes(b"\x1b");
+    assert!(matches!(state.overlay, Some(ClientShellOverlay::Help(_))));
+    state.handle_raw_events(vec![RawInputEvent::Key(crate::input::TerminalKey::new(
+        KeyCode::Char('q'),
+        KeyModifiers::CONTROL,
+    ))]);
+    assert!(matches!(state.overlay, Some(ClientShellOverlay::Help(_))));
+
+    state.handle_input_bytes(b"/q");
+    assert!(matches!(
+        state.overlay,
+        Some(ClientShellOverlay::Help(ClientHelpOverlay {
+            search_focused: true,
+            ref query,
+            ..
+        })) if query.as_str() == "q"
+    ));
+    state.handle_input_bytes(b"\x1b");
+    assert!(matches!(
+        state.overlay,
+        Some(ClientShellOverlay::Help(ClientHelpOverlay {
+            search_focused: false,
+            ..
+        }))
+    ));
+    state.handle_input_bytes(b"\x1b");
+    assert!(matches!(state.overlay, Some(ClientShellOverlay::Help(_))));
+
+    let frame = state.compose(106, 30).expect("help overlay");
+    let text = frame
+        .cells
+        .iter()
+        .map(|cell| cell.symbol.as_str())
+        .collect::<String>();
+    assert!(text.contains("q close"));
+    assert!(!text.contains("esc close"));
+    assert!(!text.contains("close esc/enter"));
+
+    let close = state.handle_input_bytes(b"q");
+    assert!(state.overlay.is_none());
+    assert!(close.repaint);
+    assert!(close.actions.is_empty());
+}
+
+#[test]
 fn help_overlay_restores_released_search_scroll_and_custom_binding_behavior() {
     let mut state = ClientShellState::new(ClientShellConfig::from_config(&Config::default()));
     let mut projection = snapshot();

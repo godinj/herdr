@@ -644,9 +644,12 @@ impl ClientShellState {
                     if let Some(ClientShellOverlay::Navigator(navigator)) = self.overlay.as_mut() {
                         navigator.search_focused = false;
                     }
-                } else {
-                    self.overlay = None;
+                    outcome.repaint = true;
                 }
+                return;
+            }
+            if !search_focused && code == KeyCode::Char('q') && modifiers.is_empty() {
+                self.overlay = None;
                 outcome.repaint = true;
                 return;
             }
@@ -842,7 +845,8 @@ impl ClientShellState {
             }
 
             match code {
-                KeyCode::Esc | KeyCode::Enter => self.overlay = None,
+                KeyCode::Char('q') if modifiers.is_empty() => self.overlay = None,
+                KeyCode::Enter => self.overlay = None,
                 KeyCode::Home => {
                     if let Some(ClientShellOverlay::Help(help)) = self.overlay.as_mut() {
                         help.scroll = 0;

@@ -594,7 +594,9 @@ fn help_overlay_uses_live_keymap_and_owns_filter_state() {
 
     assert!(state.handle_input_bytes(b"\x1b").repaint);
     assert!(matches!(state.overlay, Some(ClientShellOverlay::Help(_))));
-    assert!(state.handle_input_bytes(b"\x1b").repaint);
+    state.handle_input_bytes(b"\x1b");
+    assert!(matches!(state.overlay, Some(ClientShellOverlay::Help(_))));
+    assert!(state.handle_input_bytes(b"q").repaint);
     assert!(state.overlay.is_none());
 }
 
